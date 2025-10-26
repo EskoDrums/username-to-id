@@ -1,32 +1,35 @@
 # ============================================
 # Telegram Username ⇄ ID Converter API
-# Serverless version (for Vercel)
+# Serverless + In-Memory Session (Vercel Safe)
 # Made by @EskedarEjigu
 # ============================================
 
 from fastapi import FastAPI, Query
 from telethon.sync import TelegramClient
+from telethon.sessions import StringSession
 from telethon.errors import UsernameInvalidError, UsernameNotOccupiedError
-import re
-import os
+import re, os
 
 app = FastAPI()
 
-# === 1️⃣ Set your credentials ===
-API_ID = int(os.getenv("API_ID", "1234567"))       # set these as env variables in Vercel
+# === 1️⃣ Your Telegram API credentials ===
+API_ID = int(os.getenv("API_ID", "1234567"))
 API_HASH = os.getenv("API_HASH", "your_api_hash_here")
 
 @app.get("/")
 def home():
-    return {"message": "Username ⇄ ID API by @EskedarEjigu", "usage": "/convert?query=@username_or_id"}
+    return {
+        "message": "Username ⇄ ID API by @EskedarEjigu",
+        "usage": "/convert?query=@username_or_id"
+    }
 
 @app.get("/convert")
 def convert(query: str = Query(..., description="Telegram username or user ID")):
     query = query.strip()
 
     try:
-        # Use in-memory (ephemeral) session for serverless
-        with TelegramClient("anon", API_ID, API_HASH) as client:
+        # ✅ In-memory session (no file writing)
+        with TelegramClient(StringSession(), API_ID, API_HASH) as client:
 
             if query.startswith('@'):
                 user = client.get_entity(query)
