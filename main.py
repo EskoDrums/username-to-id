@@ -1,50 +1,48 @@
 # ============================================
 # Telegram Username ⇄ ID Converter API
+# Serverless version (for Vercel)
 # Made by @EskedarEjigu
 # ============================================
 
 from fastapi import FastAPI, Query
-from telethon import TelegramClient
+from telethon.sync import TelegramClient
+from telethon.errors import UsernameInvalidError, UsernameNotOccupiedError
 import re
-import asyncio
+import os
 
 app = FastAPI()
 
-# === Your Telegram API credentials ===
-API_ID = 21166612        # replace with your api_id
-API_HASH = "66f91326c15d44606bde39ffaea06422"
-
-# === Create a temporary MTProto client ===
-# (We’ll connect only when needed)
-async def get_client():
-    client = TelegramClient('session', API_ID, API_HASH)
-    await client.start()
-    return client
+# === 1️⃣ Set your credentials ===
+API_ID = int(os.getenv("API_ID", "1234567"))       # set these as env variables in Vercel
+API_HASH = os.getenv("API_HASH", "your_api_hash_here")
 
 @app.get("/")
 def home():
-    return {"message": "Welcome to Username ⇄ ID API by @EskedarEjigu"}
+    return {"message": "Username ⇄ ID API by @EskedarEjigu", "usage": "/convert?query=@username_or_id"}
 
 @app.get("/convert")
-async def convert(query: str = Query(..., description="Telegram username or user ID")):
+def convert(query: str = Query(..., description="Telegram username or user ID")):
     query = query.strip()
+
     try:
-        client = await get_client()
+        # Use in-memory (ephemeral) session for serverless
+        with TelegramClient("anon", API_ID, API_HASH) as client:
 
-        if query.startswith('@'):
-            user = await client.get_entity(query)
-            await client.disconnect()
-            return {"username": query, "id": user.id}
+            if query.startswith('@'):
+                user = client.get_entity(query)
+                return {"username": query, "id": user.id}
 
-        elif re.fullmatch(r'\d+', query):
-            user = await client.get_entity(int(query))
-            await client.disconnect()
-            username = f"@{user.username}" if user.username else None
-            return {"id": query, "username": username}
+            elif re.fullmatch(r'\d+', query):
+                user = client.get_entity(int(query))
+                username = f"@{user.username}" if user.username else None
+                return {"id": query, "username": username}
 
-        else:
-            await client.disconnect()
-            return {"error": "Invalid input. Send @username or numeric user ID."}
+            else:
+                return {"error": "Invalid input. Use @username or numeric user ID."}
 
+    except UsernameNotOccupiedError:
+        return {"error": "Username not found."}
+    except UsernameInvalidError:
+        return {"error": "Invalid username."}
     except Exception as e:
         return {"error": str(e)}
