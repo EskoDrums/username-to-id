@@ -1,6 +1,6 @@
 # ============================================
 # Telegram Username ⇄ ID Converter API
-# Fully async + in-memory (Vercel-ready)
+# Serverless Bot Token version (Vercel-ready)
 # Made by @EskedarEjigu
 # ============================================
 
@@ -8,29 +8,25 @@ from fastapi import FastAPI, Query
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import UsernameInvalidError, UsernameNotOccupiedError
-import re, os, asyncio
+import re, os
 
 app = FastAPI()
 
-# === 1️⃣ Your Telegram API credentials ===
 API_ID = int(os.getenv("API_ID", "1234567"))
 API_HASH = os.getenv("API_HASH", "your_api_hash_here")
-
+BOT_TOKEN = os.getenv("BOT_TOKEN", "your_bot_token_here")  # ← from @BotFather
 
 @app.get("/")
 def home():
-    return {
-        "message": "Username ⇄ ID API by @EskedarEjigu",
-        "usage": "/convert?query=@username_or_id"
-    }
-
+    return {"message": "Username ⇄ ID API by @EskedarEjigu", "usage": "/convert?query=@username_or_id"}
 
 @app.get("/convert")
 async def convert(query: str = Query(..., description="Telegram username or user ID")):
     query = query.strip()
 
-    async def process_query():
-        async with TelegramClient(StringSession(), API_ID, API_HASH) as client:
+    try:
+        # ✅ Use bot token login (no input needed)
+        async with TelegramClient(StringSession(), API_ID, API_HASH).start(bot_token=BOT_TOKEN) as client:
             if query.startswith('@'):
                 user = await client.get_entity(query)
                 return {"username": query, "id": user.id}
@@ -42,9 +38,6 @@ async def convert(query: str = Query(..., description="Telegram username or user
 
             else:
                 return {"error": "Invalid input. Use @username or numeric user ID."}
-
-    try:
-        return await process_query()
 
     except UsernameNotOccupiedError:
         return {"error": "Username not found."}
